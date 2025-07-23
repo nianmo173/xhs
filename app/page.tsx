@@ -1,22 +1,6 @@
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
-import GeneratorClient from '@/components/GeneratorClient'
 import FaqSection from '@/components/FaqSection'
-
-// 动态导入作者卡片组件，减少首次加载的资源体积
-const AuthorCard = dynamic(() => import('@/components/AuthorCard'), {
-  loading: () => (
-    <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg p-6 animate-pulse">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-6 bg-gray-200 rounded w-48"></div>
-        <div className="h-4 bg-gray-200 rounded w-96"></div>
-        <div className="h-4 bg-gray-200 rounded w-80"></div>
-        <div className="h-12 bg-gray-200 rounded w-64"></div>
-        <div className="h-3 bg-gray-200 rounded w-72"></div>
-      </div>
-    </div>
-  ),
-})
+import GeneratorClient from '@/components/GeneratorClient'
 
 export default function Home() {
   return (
@@ -44,10 +28,7 @@ export default function Home() {
         {/* FAQ区域 */}
         <FaqSection />
 
-        {/* 作者信息区域 */}
-        <div className="mt-12 text-center">
-          <AuthorCard />
-        </div>
+        {/* 作者信息区域已被删除 */}
       </div>
     </div>
   )
