@@ -9,8 +9,8 @@ import { ProcessedNote } from './types';
 
 // 缓存配置
 export const CACHE_CONFIG = {
-  // 缓存目录
-  CACHE_DIR: path.join(process.cwd(), 'data', 'cache'),
+  // 缓存目录 - 修改这里！
+  CACHE_DIR: path.join("/tmp", "data"),
   // 缓存有效期（小时）
   CACHE_EXPIRY_HOURS: 6,
   // 最大缓存文件数量
@@ -22,6 +22,8 @@ export const CACHE_CONFIG = {
 /**
  * 检查是否启用缓存功能
  */
+// ... 文件的其余部分保持不变 ...
+
 function isCacheEnabled(): boolean {
   const cacheEnabled = process.env.ENABLE_CACHE;
   // 默认启用缓存，除非明确设置为 'false'
