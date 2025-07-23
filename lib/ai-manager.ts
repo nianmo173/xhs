@@ -300,47 +300,31 @@ export class AIManager {
             temperature: CONFIG.TEMPERATURE,
           };
 
-          // 只有在非Gemini模型时才使用response_format
-          // Gemini模型对json_object格式支持有限，可能导致空响应
           if (!currentModel.toLowerCase().includes('gemini')) {
             requestParams.response_format = { type: "json_object" };
           }
-          // 注意：不设置max_tokens，让模型自然生成完整响应
 
           const response = await client.chat.completions.create(requestParams);
 
-          // [核心修复] 增加对 response.choices 的有效性检查
-          if (!response || !response.choices || response.choices.length === 0) {
-            console.error('❌ AI响应结构异常或choices为空');
-            console.error('📊 响应对象存在:', !!response);
-            console.error('📊 choices字段存在:', !!(response && response.choices));
-            console.error('📊 choices长度:', response && response.choices ? response.choices.length : 'N/A');
-            console.error('📊 响应结构:', response ? Object.keys(response) : 'response为null/undefined');
-            console.error('📊 模型:', currentModel);
-            console.error('📊 尝试次数:', attempt + 1);
+          // --- [核心修改] ---
+          // 您的代理直接返回JSON字符串，而不是标准的OpenAI对象。
+          // 所以我们直接将 response 当作 content 来处理。
+          const content = response as any;
 
-            // 只在调试模式下输出完整响应，避免日志过长
-            if (debugLoggingEnabled && response) {
-              console.error('📄 完整响应:', JSON.stringify(response, null, 2));
+          // 检查我们收到的 content 是否是一个有效的字符串
+          if (typeof content !== 'string' || content.trim() === '') {
+            console.error('❌ AI 响应为空或格式非字符串');
+            console.error('📊 响应类型:', typeof content);
+            // 只在调试模式下输出完整内容，避免日志过长
+            if (debugLoggingEnabled) {
+              console.error('📄 完整响应:', JSON.stringify(content, null, 2));
             }
-
-            throw new Error(`AI响应结构异常，缺少choices字段或choices为空数组 (模型: ${currentModel}, 尝试: ${attempt + 1})`);
+            throw new Error('AI 返回了空响应或非字符串格式');
           }
+          // --- [修改结束] ---
 
-          const content = response.choices[0]?.message?.content;
-          if (!content || content.trim() === '') {
-            // 检查finish_reason来提供更详细的错误信息
-            const finishReason = response.choices[0]?.finish_reason;
-            if (finishReason === 'length') {
-              throw new Error('AI响应被截断，可能是因为max_tokens设置过小或模型对JSON格式支持有限');
-            } else if (finishReason === 'content_filter') {
-              throw new Error('AI响应被内容过滤器阻止');
-            } else {
-              throw new Error(`AI返回了空响应，finish_reason: ${finishReason}`);
-            }
-          }
 
-          // 验证响应
+          // 验证响应 (这部分代码无需修改，现在它可以正常工作了)
           const validation = this.validateJsonResponse(content, expectedFields);
           if (!validation.isValid) {
             throw new Error(`AI响应验证失败: ${validation.errors.join(', ')}`);
@@ -358,7 +342,6 @@ export class AIManager {
             console.warn(`⚠️ 模型 ${currentModel} 尝试 ${attempt + 1} 失败:`, lastError.message);
           }
 
-          // 如果不是最后一次尝试，等待后重试
           if (attempt < this.retryConfig.maxRetries) {
             const delayMs = this.calculateDelay(attempt);
             if (debugLoggingEnabled) {
@@ -369,7 +352,6 @@ export class AIManager {
         }
       }
 
-      // 当前模型的所有重试都失败了，尝试下一个模型
       if (modelIndex < modelList.length - 1) {
         if (debugLoggingEnabled) {
           console.log(`🔄 模型 ${currentModel} 失败，尝试下一个模型: ${modelList[modelIndex + 1]}`);
@@ -397,11 +379,9 @@ export class AIManager {
     const modelList = this.getModelList();
     let lastError: Error | null = null;
 
-    // 遍历所有可用模型
     for (let modelIndex = 0; modelIndex < modelList.length; modelIndex++) {
       const currentModel = modelList[modelIndex];
 
-      // 对每个模型进行重试
       for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
         try {
           if (debugLoggingEnabled) {
@@ -409,42 +389,44 @@ export class AIManager {
           }
 
           const client = this.getClient();
-          const response = await client.chat.completions.create({
+          const stream = await client.chat.completions.create({
             model: currentModel,
             messages: [{ role: "user", content: prompt }],
             stream: true,
             temperature: CONFIG.TEMPERATURE,
           });
 
-        let hasContent = false;
-        let lastChunkTime = Date.now();
-
-        for await (const chunk of response) {
-          // [核心修复] 增加对 chunk.choices 的有效性检查
-          if (!chunk || !chunk.choices || chunk.choices.length === 0) {
-            if (debugLoggingEnabled) {
-              console.warn('⚠️ 流式响应块缺少choices字段，跳过此块');
+          let hasContent = false;
+          for await (const chunk of stream) {
+            let content = '';
+            // --- [核心修改] ---
+            // 检查 chunk 是否是标准 OpenAI 格式
+            if (chunk && chunk.choices && chunk.choices.length > 0) {
+              content = chunk.choices[0]?.delta?.content || '';
+            } 
+            // 如果不是，则假定 chunk 本身就是返回的字符串内容
+            else if (typeof chunk === 'string') {
+              content = chunk;
+            } else if (debugLoggingEnabled) {
+              console.warn('⚠️ 收到了未知格式的流式块，已忽略:', chunk);
             }
-            continue;
-          }
+            // --- [修改结束] ---
 
-          const content = chunk.choices[0]?.delta?.content || '';
-          if (content) {
-            hasContent = true;
-            lastChunkTime = Date.now();
-            onChunk(content);
-          } else {
-            // 心跳机制：如果超过500ms没有内容，发送一个空的心跳
-            const now = Date.now();
-            if (now - lastChunkTime > 500) {
-              onChunk(''); // 发送空内容作为心跳
-              lastChunkTime = now;
+            if (content) {
+              hasContent = true;
+              onChunk(content);
             }
           }
-        }
 
           if (!hasContent) {
-            throw new Error('AI没有返回任何内容');
+            // 检查流的最后一个对象是否有 finish_reason
+            // 注意：非标准代理可能不会返回这个
+            const finalChunk: any = (stream as any).controller?.response?.body?.finalChunk;
+            const finishReason = finalChunk?.choices?.[0]?.finish_reason;
+            if (finishReason === 'length' || finishReason === 'content_filter') {
+              throw new Error(`AI流式响应异常，finish_reason: ${finishReason}`);
+            }
+            throw new Error('AI流式响应未返回任何内容');
           }
 
           if (debugLoggingEnabled) {
@@ -459,7 +441,6 @@ export class AIManager {
             console.warn(`⚠️ 模型 ${currentModel} 流式生成尝试 ${attempt + 1} 失败:`, lastError.message);
           }
 
-          // 如果不是最后一次尝试，等待后重试
           if (attempt < this.retryConfig.maxRetries) {
             const delayMs = this.calculateDelay(attempt);
             if (debugLoggingEnabled) {
@@ -470,7 +451,6 @@ export class AIManager {
         }
       }
 
-      // 当前模型的所有重试都失败了，尝试下一个模型
       if (modelIndex < modelList.length - 1) {
         if (debugLoggingEnabled) {
           console.log(`🔄 模型 ${currentModel} 失败，尝试下一个模型: ${modelList[modelIndex + 1]}`);
@@ -478,7 +458,6 @@ export class AIManager {
       }
     }
 
-    // 所有模型和重试都失败了
     const finalError = new BusinessError(
       `流式生成失败，已尝试所有模型 [${modelList.join(', ')}]，每个模型重试${this.retryConfig.maxRetries}次: ${lastError?.message}`,
       '内容生成失败',
@@ -502,8 +481,6 @@ export class AIManager {
   resetClient(): void {
     this.client = null;
   }
-
-
 }
 
 // 导出单例实例
