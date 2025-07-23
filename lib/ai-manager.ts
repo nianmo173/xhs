@@ -102,7 +102,6 @@ export class AIManager {
       return { isValid: false, data: null, errors };
     }
 
-    // 添加调试信息
     if (debugLoggingEnabled) {
       console.log(`🔍 AI响应内容长度: ${content.length} 字符`);
       console.log(`🔍 AI响应前100字符: ${content.substring(0, 100)}...`);
@@ -119,14 +118,11 @@ export class AIManager {
       console.log(`✅ JSON解析成功，包含字段: ${Object.keys(parsed).join(', ')}`);
     }
 
-    // 检查必需字段
     for (const field of expectedFields) {
       if (!(field in parsed) || !parsed[field]) {
         errors.push(`缺少必需字段: ${field}`);
       }
     }
-
-    // 兼容旧版本的rules验证
     if (expectedFields.includes('rules')) {
       if (!Array.isArray(parsed.rules) || parsed.rules.length === 0) {
         errors.push('rules字段应该是非空数组');
@@ -134,20 +130,15 @@ export class AIManager {
         console.log(`✅ rules数组包含 ${parsed.rules.length} 个规律`);
       }
     }
-
-    // 新版本爆款公式报告的验证
     if (expectedFields.includes('titleFormulas')) {
       this.validateTitleFormulas(parsed.titleFormulas, errors);
     }
-
     if (expectedFields.includes('contentStructure')) {
       this.validateContentStructure(parsed.contentStructure, errors);
     }
-
     if (expectedFields.includes('tagStrategy')) {
       this.validateTagStrategy(parsed.tagStrategy, errors);
     }
-
     if (expectedFields.includes('coverStyleAnalysis')) {
       this.validateCoverStyleAnalysis(parsed.coverStyleAnalysis, errors);
     }
@@ -159,71 +150,52 @@ export class AIManager {
     };
   }
 
-  /**
-   * 验证标题公式结构
-   */
   private validateTitleFormulas(titleFormulas: any, errors: string[]): void {
     if (!titleFormulas || typeof titleFormulas !== 'object') {
       errors.push('titleFormulas字段缺失或格式错误');
       return;
     }
-
     if (!Array.isArray(titleFormulas.suggestedFormulas) || titleFormulas.suggestedFormulas.length === 0) {
       errors.push('titleFormulas.suggestedFormulas应该是非空数组');
     } else if (debugLoggingEnabled) {
       console.log(`✅ 标题公式包含 ${titleFormulas.suggestedFormulas.length} 个公式`);
     }
-
     if (!Array.isArray(titleFormulas.commonKeywords)) {
       errors.push('titleFormulas.commonKeywords应该是数组');
     }
   }
 
-  /**
-   * 验证内容结构
-   */
   private validateContentStructure(contentStructure: any, errors: string[]): void {
     if (!contentStructure || typeof contentStructure !== 'object') {
       errors.push('contentStructure字段缺失或格式错误');
       return;
     }
-
     if (!Array.isArray(contentStructure.openingHooks) || contentStructure.openingHooks.length === 0) {
       errors.push('contentStructure.openingHooks应该是非空数组');
     }
-
     if (!Array.isArray(contentStructure.endingHooks) || contentStructure.endingHooks.length === 0) {
       errors.push('contentStructure.endingHooks应该是非空数组');
     }
-
     if (!contentStructure.bodyTemplate || typeof contentStructure.bodyTemplate !== 'string') {
       errors.push('contentStructure.bodyTemplate应该是字符串');
     }
-
     if (debugLoggingEnabled) {
       console.log(`✅ 内容结构验证通过：${contentStructure.openingHooks?.length || 0}个开头，${contentStructure.endingHooks?.length || 0}个结尾`);
     }
   }
 
-  /**
-   * 验证标签策略
-   */
   private validateTagStrategy(tagStrategy: any, errors: string[]): void {
     if (!tagStrategy || typeof tagStrategy !== 'object') {
       errors.push('tagStrategy字段缺失或格式错误');
       return;
     }
-
     if (debugLoggingEnabled) {
       console.log(`🔍 tagStrategy结构:`, JSON.stringify(tagStrategy, null, 2));
     }
-
-    // 检查 commonTags 字段
     if (!tagStrategy.commonTags) {
       if (debugLoggingEnabled) {
         console.log(`⚠️ commonTags字段不存在，尝试从其他字段提取`);
       }
-      // 如果 commonTags 不存在，尝试从 tagCategories 中提取
       if (tagStrategy.tagCategories) {
         const extractedTags = [];
         if (Array.isArray(tagStrategy.tagCategories.coreKeywords)) {
@@ -232,12 +204,12 @@ export class AIManager {
         if (Array.isArray(tagStrategy.tagCategories.longTailKeywords)) {
           extractedTags.push(...tagStrategy.tagCategories.longTailKeywords);
         }
-        tagStrategy.commonTags = extractedTags.slice(0, 10); // 取前10个作为常用标签
+        tagStrategy.commonTags = extractedTags.slice(0, 10);
         if (debugLoggingEnabled) {
           console.log(`🔧 自动生成commonTags:`, tagStrategy.commonTags);
         }
       } else {
-        tagStrategy.commonTags = []; // 设置默认空数组
+        tagStrategy.commonTags = [];
       }
     } else if (!Array.isArray(tagStrategy.commonTags)) {
       if (debugLoggingEnabled) {
@@ -246,25 +218,19 @@ export class AIManager {
       }
       errors.push('tagStrategy.commonTags应该是数组');
     }
-
     if (debugLoggingEnabled) {
       console.log(`✅ 标签策略验证通过：${tagStrategy.commonTags?.length || 0}个常用标签`);
     }
   }
 
-  /**
-   * 验证封面风格分析
-   */
   private validateCoverStyleAnalysis(coverStyleAnalysis: any, errors: string[]): void {
     if (!coverStyleAnalysis || typeof coverStyleAnalysis !== 'object') {
       errors.push('coverStyleAnalysis字段缺失或格式错误');
       return;
     }
-
     if (!Array.isArray(coverStyleAnalysis.commonStyles) || coverStyleAnalysis.commonStyles.length === 0) {
       errors.push('coverStyleAnalysis.commonStyles应该是非空数组');
     }
-
     if (debugLoggingEnabled) {
       console.log(`✅ 封面风格分析验证通过：${coverStyleAnalysis.commonStyles?.length || 0}个风格`);
     }
@@ -280,11 +246,9 @@ export class AIManager {
     const modelList = this.getModelList();
     let lastError: Error | null = null;
 
-    // 遍历所有可用模型
     for (let modelIndex = 0; modelIndex < modelList.length; modelIndex++) {
       const currentModel = modelList[modelIndex];
 
-      // 对每个模型进行重试
       for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
         try {
           if (debugLoggingEnabled) {
@@ -293,7 +257,6 @@ export class AIManager {
 
           const client = this.getClient();
 
-          // 为Gemini模型调整请求参数
           const requestParams: any = {
             model: currentModel,
             messages: [{ role: "user", content: prompt }],
@@ -304,27 +267,44 @@ export class AIManager {
             requestParams.response_format = { type: "json_object" };
           }
 
-          const response = await client.chat.completions.create(requestParams);
+          const response: any = await client.chat.completions.create(requestParams);
+          
+          let content: string = '';
 
-          // --- [核心修改] ---
-          // 您的代理直接返回JSON字符串，而不是标准的OpenAI对象。
-          // 所以我们直接将 response 当作 content 来处理。
-          const content = response as any;
-
-          // 检查我们收到的 content 是否是一个有效的字符串
-          if (typeof content !== 'string' || content.trim() === '') {
-            console.error('❌ AI 响应为空或格式非字符串');
-            console.error('📊 响应类型:', typeof content);
-            // 只在调试模式下输出完整内容，避免日志过长
+          // --- [终极核心修复] ---
+          // 检查并处理各种可能的代理响应格式
+          if (Array.isArray(response)) {
+            // 情况1：代理返回了字符数组，如 ['{', '"', 'a',...]}
             if (debugLoggingEnabled) {
-              console.error('📄 完整响应:', JSON.stringify(content, null, 2));
+              console.log('🔧 检测到AI响应为数组格式，正在合并为字符串...');
             }
-            throw new Error('AI 返回了空响应或非字符串格式');
+            content = response.join('');
+          } else if (typeof response === 'string') {
+            // 情况2：代理直接返回了字符串
+            if (debugLoggingEnabled) {
+              console.log('🔧 检测到AI响应为原生字符串格式。');
+            }
+            content = response;
+          } else if (response && response.choices && response.choices.length > 0) {
+            // 情况3：标准的OpenAI响应格式
+            if (debugLoggingEnabled) {
+              console.log('🔧 检测到AI响应为标准OpenAI对象格式。');
+            }
+            content = response.choices[0]?.message?.content || '';
           }
-          // --- [修改结束] ---
+          // --- [修复结束] ---
 
+          // 对最终提取的 content 进行非空验证
+          if (!content || content.trim() === '') {
+            console.error('❌ AI响应在所有格式检查后仍为空或无效');
+            // 在调试模式下打印原始响应以供分析
+            if (debugLoggingEnabled) {
+                console.error('📄 原始响应的完整内容:', JSON.stringify(response, null, 2));
+            }
+            throw new Error('AI返回了空内容或无法识别的响应格式');
+          }
 
-          // 验证响应 (这部分代码无需修改，现在它可以正常工作了)
+          // 验证JSON内容
           const validation = this.validateJsonResponse(content, expectedFields);
           if (!validation.isValid) {
             throw new Error(`AI响应验证失败: ${validation.errors.join(', ')}`);
@@ -337,11 +317,9 @@ export class AIManager {
 
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
-
           if (debugLoggingEnabled) {
             console.warn(`⚠️ 模型 ${currentModel} 尝试 ${attempt + 1} 失败:`, lastError.message);
           }
-
           if (attempt < this.retryConfig.maxRetries) {
             const delayMs = this.calculateDelay(attempt);
             if (debugLoggingEnabled) {
@@ -359,7 +337,6 @@ export class AIManager {
       }
     }
 
-    // 所有模型和重试都失败了
     throw new BusinessError(
       `AI分析失败，已尝试所有模型 [${modelList.join(', ')}]，每个模型重试${this.retryConfig.maxRetries}次: ${lastError?.message}`,
       'AI分析失败',
@@ -399,18 +376,15 @@ export class AIManager {
           let hasContent = false;
           for await (const chunk of stream) {
             let content = '';
-            // --- [核心修改] ---
-            // 检查 chunk 是否是标准 OpenAI 格式
+            // 同时处理标准格式和代理可能返回的纯字符串块
             if (chunk && chunk.choices && chunk.choices.length > 0) {
               content = chunk.choices[0]?.delta?.content || '';
             } 
-            // 如果不是，则假定 chunk 本身就是返回的字符串内容
             else if (typeof chunk === 'string') {
               content = chunk;
             } else if (debugLoggingEnabled) {
               console.warn('⚠️ 收到了未知格式的流式块，已忽略:', chunk);
             }
-            // --- [修改结束] ---
 
             if (content) {
               hasContent = true;
@@ -419,13 +393,6 @@ export class AIManager {
           }
 
           if (!hasContent) {
-            // 检查流的最后一个对象是否有 finish_reason
-            // 注意：非标准代理可能不会返回这个
-            const finalChunk: any = (stream as any).controller?.response?.body?.finalChunk;
-            const finishReason = finalChunk?.choices?.[0]?.finish_reason;
-            if (finishReason === 'length' || finishReason === 'content_filter') {
-              throw new Error(`AI流式响应异常，finish_reason: ${finishReason}`);
-            }
             throw new Error('AI流式响应未返回任何内容');
           }
 
@@ -436,11 +403,9 @@ export class AIManager {
 
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
-
           if (debugLoggingEnabled) {
             console.warn(`⚠️ 模型 ${currentModel} 流式生成尝试 ${attempt + 1} 失败:`, lastError.message);
           }
-
           if (attempt < this.retryConfig.maxRetries) {
             const delayMs = this.calculateDelay(attempt);
             if (debugLoggingEnabled) {
