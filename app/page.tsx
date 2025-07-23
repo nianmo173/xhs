@@ -36,22 +36,6 @@ export default function Home() {
             >
               📚 写作攻略
             </Link>
-            <a
-              href="https://www.xiaohongshu.com/user/profile/5e141963000000000100158e"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 text-sm text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              📱 关注作者小红书
-            </a>
-            <a
-              href="https://github.com/EBOLABOY/xhs-ai-writer"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              ⭐ GitHub
-            </a>
           </div>
         </div>
 
